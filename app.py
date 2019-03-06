@@ -15,10 +15,6 @@ api = Api(app)
 
 jwt = JWT(app, authenticate, identity)
 
-@app.before_first_request
-def create_tables():
-    db.create_all()
-
 api.add_resource(Agent, '/agent/<string:name>')
 api.add_resource(AgentList, '/agents')
 api.add_resource(ProcessList, '/processes')
