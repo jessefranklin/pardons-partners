@@ -3,13 +3,13 @@ from models.agent import AgentModel
 
 
 class Agent(Resource):
-    def get(self, name):
+    def get(self, name: str):
         agent = AgentModel.find_by_name(name)
         if agent:
             return agent.json()
         return {'message': 'Agent not found'}, 404
 
-    def post(self, name):
+    def post(self, name: str):
         if AgentModel.find_by_name(name):
             return {'message': "A agent with name '{}' already exists.".format(name)}, 400
 
@@ -21,7 +21,7 @@ class Agent(Resource):
 
         return agent.json(), 201
 
-    def delete(self, name):
+    def delete(self, name: str):
         agent = AgentModel.find_by_name(name)
         if agent:
             agent.delete_from_db()
@@ -31,4 +31,4 @@ class Agent(Resource):
 
 class AgentList(Resource):
     def get(self):
-        return {'agents': [agent.json() for agent in AgentModel.query.all()]}
+        return {'agents': [agent.json() for agent in AgentModel.find_all()]}
