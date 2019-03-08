@@ -1,4 +1,4 @@
-
+import traceback
 from flask_restful import Resource, reqparse
 from flask import request, render_template, make_response
 from werkzeug.security import safe_str_cmp
@@ -12,6 +12,8 @@ from flask_jwt_extended import (
 )
 from models.user import UserModel
 from blacklist import BLACKLIST
+from libs.mailgun import MailGunException
+from models.confirmation import ConfirmationModel
 
 BLANK_ERROR = "'{}' cannot be blank."
 
@@ -25,10 +27,6 @@ _user_parser.add_argument(
 _user_parser.add_argument(
     "email", type=str, help=BLANK_ERROR.format("email")
 )
-_user_parser.add_argument(
-    "activated", type=bool
-)
-
 
 class UserRegister(Resource):
 
@@ -42,12 +40,20 @@ class UserRegister(Resource):
         if UserModel.find_by_email(data['email']):
             return {"message": "Email already exists."}, 400
 
-
         user = UserModel(**data)
-        user.save_to_db()
-        user.send_confirmation_email()
 
-        return {"message": "User created sucessfully"}, 201
+        try:
+            user.save_to_db()
+            confirmation = ConfirmationModel(user.id)
+            confirmation.save_to_db()
+            user.send_confirmation_email()
+            return {"message": 'succcess'}, 201
+        except MailGunException as e:
+            user.delete_from_db()
+            return {"message": str(e)}, 500
+        except:
+            traceback.print_exc()
+            return {"message": 'failed'}, 500
 
 
 class User(Resource):
@@ -75,7 +81,8 @@ class UserLogin(Resource):
         user = UserModel.find_by_username(data['username'])
 
         if user and safe_str_cmp(user.password, data['password']):
-            if user.activated:
+            confirmation = user.most_recent_confirmation
+            if confirmation and confirmation.confirmed:
                 access_token = create_access_token(identity=user.id, fresh=True)
                 refresh_token = create_refresh_token(user.id)
                 return {'access_token': access_token, 'refresh_token': refresh_token}, 200

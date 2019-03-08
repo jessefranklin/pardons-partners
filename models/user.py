@@ -3,7 +3,7 @@ from requests import Response
 from db import db
 
 from libs.mailgun import Mailgun
-
+from models.confirmation import ConfirmationModel
 
 class UserModel(db.Model):
     __tablename__ = 'users'
@@ -12,21 +12,26 @@ class UserModel(db.Model):
     username = db.Column(db.String(80), unique=True)
     password = db.Column(db.String(80))
     email = db.Column(db.String(80), nullable=False, unique=True)
-    activated = db.Column(db.Boolean, default=False)
 
-    def __init__(self, username: str, password: str, email: str, activated: bool):
+    confirmation = db.relationship(
+        "ConfirmationModel", lazy="dynamic", cascade="all, delete-orphan"
+    )
+
+    def __init__(self, username: str, password: str, email: str):
         self.username = username
         self.password = password
         self.email = email
-        self.activated = activated
 
     def json(self):
         return {
             'id': self.id,
             'username': self.username,
-            'email': self.email,
-            'activated': self.activated
+            'email': self.email
         }
+
+    @property
+    def most_recent_confirmation(self) -> "ConfirmationModel":
+        return self.confirmation.order_by(db.desc(ConfirmationModel.expire_at)).first()
 
     @classmethod
     def find_by_username(cls, username: str):
@@ -41,7 +46,9 @@ class UserModel(db.Model):
         return cls.query.filter_by(id=_id).first()
 
     def send_confirmation_email(self) -> Response:
-        link = request.url_root[:-1] + url_for("userconfirm", user_id=self.id)
+        link = request.url_root[:-1] + url_for(
+            "confirmation", confirmation_id=self.most_recent_confirmation.id
+        )
         subject = "Registration confimration"
         text = f"Please click the link to confirm your registration link {link}"
         html = f'<html>Please click the link to confirm your registration <a href="{link}">{link}</a> </html>'

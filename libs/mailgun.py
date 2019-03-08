@@ -3,6 +3,11 @@ from typing import List
 from requests import Response, post
 
 
+class MailGunException(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
 class Mailgun:
     MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN")
     MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY")
