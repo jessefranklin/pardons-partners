@@ -1,11 +1,25 @@
-import sqlite3
 from flask_restful import Resource, reqparse
-from flask_jwt import jwt_required
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_claims,
+    jwt_optional,
+    get_jwt_identity,
+    fresh_jwt_required
+)
 from models.process import ProcessModel
 
+
 class ProcessList(Resource):
+    @jwt_optional
     def get(self):
-        return {'processes': list(map(lambda x: x.json(), ProcessModel.query.all()))}
+        user_id = get_jwt_identity()
+        proccesses =  [x.json() for x in ProcessModel.find_all()]
+        if user_id:
+            return {'processes': proccesses}, 200
+
+        return {'processes': [x['name'] for x in proccesses],
+                'message': 'More data available for logged in users'
+                },200
 
 
 class Process(Resource):
@@ -21,20 +35,21 @@ class Process(Resource):
                        help="Every progress needs an agent id"
                        )
 
-    @jwt_required()
-    def get(self, name):
+    @jwt_required
+    def get(self, name: str):
         process = ProcessModel.find_by_name(name)
         if process:
             return process.json()
         return {'message': 'process not found'}, 404
 
-    def post(self, name):
+    @fresh_jwt_required
+    def post(self, name: str):
 
         if ProcessModel.find_by_name(name):
             return {'message': "an item with name {} already exists".format(name)}, 400
 
         data = Process.parser.parse_args()
-
+        print(data['progress'])
         process = ProcessModel(name, **data)
 
         try:
@@ -44,14 +59,18 @@ class Process(Resource):
 
         return process.json(), 201
 
-    def delete(self, name):
+    @jwt_required
+    def delete(self, name: str):
+        claims = get_jwt_claims()
+        if not claims['is_admin']:
+            return {'message': 'Admin privlages required.'}, 401
         process = ProcessModel.find_by_name(name)
         if process:
             process.delete_from_db()
+            return {'message': 'item deleted'}
+        return {'message': 'item not found'}, 404
 
-        return {'message': 'item deleted'}
-
-    def put(self, name):
+    def put(self, name: str):
         data = Process.parser.parse_args()
         process = ProcessModel.find_by_name(name)
 
