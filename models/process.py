@@ -12,7 +12,6 @@ class ProcessModel(db.Model):
     progress = db.Column(db.Float(precision=2))
 
     agent_id = db.Column(db.Integer, db.ForeignKey('agents.id'))
-    agent = db.relationship('AgentModel')
 
 
     def __init__(self, name: str, progress: int, agent_id: int):
